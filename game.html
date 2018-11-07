@@ -1,0 +1,221 @@
+<script src="https://cdn.jsdelivr.net/npm/vue"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-cookie@2/src/js.cookie.min.js"></script>
+<div class="gameContainer" id="app">
+    <div v-if="loading">
+        <img src="<?=$loadImage;?>" width="128px" style="position:fixed;top:50vh;left:50vw;transform:translate(-50%,-50%);">
+    </div>
+    <div v-else>
+        <ul id="ugc" class="upgradesContainer" :class="{open: upgradesView}">
+            <h2>Available Upgrades</h2>
+            <li v-for="(ug, key) in possibleUpgrades">[{{upgradeCount(ug.slug)}}] {{ug.name}} | {{ug.description}} <button class="btn-prime full-width" :class="{'disabled': !canAfford(key)}" @click="buyUpgrade(key)">Get This ({{getPrice(key, true)}} Coins)</button></li>
+        </ul>
+        <div id="gameView" class="game" :class="{open: upgradesView}">
+            <h2>{{ user.username }}'s Coin Farm</h2>
+            <div class="coins"><i class="fas fa-money-bill"></i> {{ displayCoins }}</div>
+            <div class="perclick">Gaining {{ displayPerClick }} Every Click And {{ displayPerSecond }} Every Second</div>
+            <button @click="handleClickerClick" class="clicker"><img src="/favicon.ico" alt="Alytro Logo"></button>
+        </div>
+        <button class="btn-prime" @click="toggleUpgradesView" style="position: fixed;bottom: 20px;left: 20px;"><i v-if="upgradesView" class="fas fa-star"></i><i v-else class="far fa-star"></i> Upgrades</button>
+    </div>
+</div>
+<script>
+    var store = window.localStorage;
+    var app = new Vue({
+        el: '#app',
+        data: {
+            user: <?=json_encode($gu->user);?>,
+            coins: 0,
+            lastCoins: 0,
+            perClick: 0,
+            perSecond: 0,
+            upgrades: [],
+            possibleUpgrades: {
+                "2CPS": {"slug": "2cps", "name": "1 CPS", "description": "+1 Coins Per Second", "price": 500},
+                "10CPS": {"slug": "10cps", "name": "10 CPS", "description": "+10 Coins Per Second", "price": 10000},
+                "100CPS": {"slug": "100cps", "name": "100 CPS", "description": "+100 Coins Per Second", "price": 80000},
+                "1000CPS": {"slug": "1000cps", "name": "1000 CPS", "description": "+1000 Coins Per Second", "price": 800000},
+                "10000CPS": {"slug": "10000cps", "name": "10000 CPS", "description": "+10000 Coins Per Second", "price": 9000000},
+                "100000CPS": {"slug": "100000cps", "name": "100000 CPS", "description": "+100000 Coins Per Second", "price": 100000000},
+                "2CPC": {"slug": "2cpc", "name": "1 CPC", "description": "+1 Coins Per Click", "price": 100},
+                "10CPC": {"slug": "10cpc", "name": "10 CPC", "description": "+10 Coins Per Click", "price": 2000},
+                "100CPC": {"slug": "100cpc", "name": "100 CPC", "description": "+100 Coins Per Click", "price": 30000},
+                "1000CPC": {"slug": "1000cpc", "name": "1000 CPC", "description": "+1000 Coins Per Click", "price": 400000},
+                "10000CPC": {"slug": "10000cpc", "name": "10000 CPC", "description": "+10000 Coins Per Click", "price": 5000000},
+                "100000CPC": {"slug": "100000cpc", "name": "100000 CPC", "description": "+100000 Coins Per Click", "price": 80000000},
+            },
+            loading: true,
+            upgradesView: false
+        },
+        methods: {
+            getCoins() {
+                this.coins = (store.getItem('gameCoins')) ? parseInt(store.getItem('gameCoins')) : 0;
+            },
+            getPerClick() {
+                this.perClick = (store.getItem('perClick')) ? parseInt(store.getItem('perClick')) : 0;
+            },
+            getUpgrades() {
+                this.upgrades = (store.getItem('upgrades')) ? JSON.parse(store.getItem('upgrades')) : "[]";
+            },
+            setupGame() {
+                if(!store.getItem('gameCoins')) {
+                    store.setItem('gameCoins', 0);
+                }
+                if(!store.getItem('perClick')) {
+                    store.setItem('perClick', 1);
+                }
+                if(!store.getItem('upgrades')) {
+                    store.setItem('upgrades', "[]");
+                }
+                this.getCoins();
+                this.getPerClick();
+                this.getUpgrades();
+                this.computeUpgrades();
+                this.lastCoins = this.coins;
+                setTimeout(() => {
+                    this.loading = false;
+                }, 250);
+            },
+            handleClickerClick() {
+                this.coins += parseInt(this.perClick);
+            },
+            saveProgressToLocalStorage() {
+                // if((this.coins - this.lastCoins) > ((this.perClick * 10) + this.perSecond)) {
+                //     this.resetGame(true);
+                // }
+                this.lastCoins = this.coins;
+                store.setItem('gameCoins', this.coins);
+                store.setItem('perClick', this.perClick);
+                store.setItem('upgrades', JSON.stringify(this.upgrades));
+                document.title = this.displayCoins + ' Coins - Project Alytro';
+            },
+            givePerSecond() {
+                this.coins += parseInt(this.perSecond);
+            },
+            buyUpgrade(key) {
+                let item = this.possibleUpgrades[key];
+                if (this.coins >= this.getPrice(key)) {
+                    this.coins -= this.getPrice(key);
+                    this.upgrades.push(this.possibleUpgrades[key]);
+                    this.computeUpgrades()
+                }
+            },
+            computeUpgrades() {
+                this.perClick = 1;
+                this.perSecond = 0;
+                for(ug of this.upgrades) {
+                    switch (ug.slug) {
+                        case "2cpc":
+                            this.perClick += 1;
+                            break;
+                        case "2cps":
+                            this.perSecond += 1;
+                            break;
+                        case "10cpc":
+                            this.perClick += 10;
+                            break;
+                        case "10cps":
+                            this.perSecond += 10;
+                            break;
+                        case "100cpc":
+                            this.perClick += 100;
+                            break;
+                        case "100cps":
+                            this.perSecond += 100;
+                            break;
+                        case "1000cpc":
+                            this.perClick += 1000;
+                            break;
+                        case "1000cps":
+                            this.perSecond += 1000;
+                            break;
+                        case "10000cpc":
+                            this.perClick += 10000;
+                            break;
+                        case "10000cps":
+                            this.perSecond += 10000;
+                            break;
+                        case "100000cpc":
+                            this.perClick += 100000;
+                            break;
+                        case "100000cps":
+                            this.perSecond += 100000;
+                            break;
+                    
+                        default:
+                            console.warn('Unhandeled Upgrade Slug: ' + ug.slug);
+                            new Noty({
+                                text: 'Unknown Error Occoured. Check Console For More Info',
+                                type: 'warning'
+                            }).show();
+                            break;
+                    }
+                }
+            },
+            getPrice(key, toLocal = false) {
+                let price;
+                if (this.upgradeCount(this.possibleUpgrades[key].slug) >= 1) {
+                    price = parseInt(this.possibleUpgrades[key].price + (this.upgradeCount(this.possibleUpgrades[key].slug) * (this.possibleUpgrades[key].price / 10)));
+                } else {
+                    price = this.possibleUpgrades[key].price;
+                }
+                if (toLocal) {
+                    return price.toLocaleString('us', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+                }
+                return price
+            },
+            upgradeCount(slug) {
+                let count = 0;
+                for(ug of this.upgrades) {
+                    if(ug.slug == slug) count++
+                }
+                return count;
+            },
+            resetGame(cheating = false) {
+                if (cheating) {
+                    new Noty({
+                        text: 'Cheating Detected',
+                        type: 'error'
+                    }).show()
+                }
+                this.upgrades = [];
+                this.perSecond = 0;
+                this.perClick = 0;
+                this.coins = 0;
+                this.lastCoins = 0;
+                this.saveProgressToLocalStorage();
+                this.setupGame();
+            },
+            toggleUpgradesView() {
+                this.upgradesView = !this.upgradesView;
+            },
+            canAfford(key) {
+                if (this.coins >= this.getPrice(key)) {
+                    return true;
+                }
+                return false;
+            }
+        },
+        computed: {
+            displayCoins() {
+                return this.coins.toLocaleString('us', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+            },
+            displayPerClick() {
+                return this.perClick.toLocaleString('us', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+            },
+            displayPerSecond() {
+                return this.perSecond.toLocaleString('us', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+            }
+        },
+        mounted() {
+            this.setupGame();
+        }
+    });
+
+    setInterval(() => {
+        app.saveProgressToLocalStorage();
+    }, 100);
+
+    setInterval(() => {
+        app.givePerSecond();
+    }, 1000);
+</script>
